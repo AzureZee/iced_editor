@@ -4,4 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-iced ={ git="https://github.com/iced-rs/iced.git",rev = "refs/tags/text-editor"}
+iced = { git = "https://github.com/iced-rs/iced.git", rev = "refs/tags/text-editor", features = [
+    "debug",
+] }
+rfd = "0.12"
+tokio = { version = "1.32", features = ["fs"] }
