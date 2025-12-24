@@ -5,9 +5,8 @@ use std::{
 };
 
 use iced::{
-    executor,
+    Application, Command, Element, Length, Settings, Theme, executor,
     widget::{button, column, container, horizontal_space, row, text, text_editor},
-    Application, Command, Element, Length, Settings, Theme,
 };
 
 fn main() -> iced::Result {
@@ -21,7 +20,10 @@ struct Editor {
 }
 #[derive(Debug, Clone)]
 enum Message {
+    New,
     Open,
+    Save,
+    FileSaved(Result<PathBuf, Error>),
     Edit(text_editor::Action),
     FileOpened(Result<(PathBuf, Arc<String>), Error>),
 }
@@ -51,6 +53,7 @@ impl Application for Editor {
         match message {
             Message::Edit(action) => {
                 self.content.edit(action);
+                self.error = None;
                 Command::none()
             }
             Message::FileOpened(Ok((path, content))) => {
@@ -63,21 +66,49 @@ impl Application for Editor {
                 Command::none()
             }
             Message::Open => Command::perform(pick_file(), Message::FileOpened),
+            Message::New => {
+                self.path = None;
+                self.content = text_editor::Content::new();
+                Command::none()
+            }
+            Message::Save => {
+                let text = self.content.text();
+                Command::perform(save_file(self.path.clone(), text), Message::FileSaved)
+            }
+            Message::FileSaved(Ok(path)) => {
+                self.path = Some(path);
+                Command::none()
+            }
+            Message::FileSaved(Err(error)) => {
+                self.error = Some(error);
+                Command::none()
+            }
         }
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let controls = row!(button("Open").on_press(Message::Open));
-        let file_path = match self.path.as_deref().and_then(Path::to_str) {
-            Some(path) => text(path).size(14),
-            None => text(""),
-        };
+        let controls = row!(
+            button("New").on_press(Message::New),
+            button("Open").on_press(Message::Open),
+            button("Save").on_press(Message::Save),
+        ).spacing(10);
         let input = text_editor(&self.content).on_edit(Message::Edit);
-        let position = {
-            let (line, column) = self.content.cursor_position();
-            text(format!("{}:{}", line + 1, column + 1))
+        let status_bar = {
+            let status = if let Some(Error::IOFailed(error)) = self.error.as_ref() {
+                text(error.to_string())
+            } else {
+                match self.path.as_deref().and_then(Path::to_str) {
+                    Some(path) => text(path).size(14),
+                    None => text("New file"),
+                }
+            };
+            let position = {
+                let (line, column) = self.content.cursor_position();
+                text(format!("{}:{}", line + 1, column + 1))
+            };
+
+            row!(status, horizontal_space(Length::Fill), position)
         };
-        let status_bar = row!(file_path, horizontal_space(Length::Fill), position);
         container(column!(controls, input, status_bar))
             .padding(10)
             .into()
@@ -101,13 +132,31 @@ async fn load_file(path: PathBuf) -> Result<(PathBuf, Arc<String>), Error> {
     let content = tokio::fs::read_to_string(&path)
         .await
         .map(Arc::new)
-        .map_err(|err| err.kind())
-        .map_err(Error::IO)?;
+        .map_err(|error| Error::IOFailed(error.kind()))?;
     Ok((path, content))
+}
+
+async fn save_file(path: Option<PathBuf>, text: String) -> Result<PathBuf, Error> {
+    let path = if let Some(path) = path
+        && path.is_file()
+    {
+        path
+    } else {
+        rfd::AsyncFileDialog::new()
+            .set_title("Create a file")
+            .save_file()
+            .await
+            .ok_or(Error::DialogClosed)
+            .map(|handle| handle.path().to_path_buf())?
+    };
+    tokio::fs::write(&path, &text)
+        .await
+        .map_err(|error| Error::IOFailed(error.kind()))?;
+    Ok(path)
 }
 
 #[derive(Debug, Clone)]
 enum Error {
     DialogClosed,
-    IO(io::ErrorKind),
+    IOFailed(io::ErrorKind),
 }
