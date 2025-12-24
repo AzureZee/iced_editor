@@ -5,12 +5,19 @@ use std::{
 };
 
 use iced::{
-    Application, Command, Element, Length, Settings, Theme, executor,
+    Application, Command, Element, Font, Length, Settings, Theme, executor,
     widget::{button, column, container, horizontal_space, row, text, text_editor},
 };
 
 fn main() -> iced::Result {
-    Editor::run(Settings::default())
+    Editor::run(Settings {
+        fonts: vec![
+            include_bytes!("../fonts/editor_icons.ttf")
+                .as_slice()
+                .into(),
+        ],
+        ..Settings::default()
+    })
 }
 
 struct Editor {
@@ -88,10 +95,11 @@ impl Application for Editor {
 
     fn view(&self) -> Element<'_, Message> {
         let controls = row!(
-            button("New").on_press(Message::New),
-            button("Open").on_press(Message::Open),
-            button("Save").on_press(Message::Save),
-        ).spacing(10);
+            action(new_icon(), Message::New),
+            action(open_icon(), Message::Open),
+            action(save_icon(), Message::Save),
+        )
+        .spacing(10);
         let input = text_editor(&self.content).on_edit(Message::Edit);
         let status_bar = {
             let status = if let Some(Error::IOFailed(error)) = self.error.as_ref() {
@@ -117,6 +125,31 @@ impl Application for Editor {
     fn theme(&self) -> Theme {
         self::Theme::Dark
     }
+}
+
+fn action<'a>(content: Element<'a, Message>, on_press: Message) -> Element<'a, Message> {
+    button(container(content).width(30).center_x())
+        .on_press(on_press)
+        .padding([5, 10])
+        .into()
+}
+
+const SAVE_ICON: char = '\u{E800}';
+const NEW_ICON: char = '\u{E801}';
+const OPEN_ICON: char = '\u{F115}';
+fn new_icon<'a, Message>() -> Element<'a, Message> {
+    icon(NEW_ICON)
+}
+fn save_icon<'a, Message>() -> Element<'a, Message> {
+    icon(SAVE_ICON)
+}
+fn open_icon<'a, Message>() -> Element<'a, Message> {
+    icon(OPEN_ICON)
+}
+fn icon<'a, Message>(codepoint: char) -> Element<'a, Message> {
+    const ICON_FONT: Font = Font::with_name("editor_icons");
+
+    text(codepoint).font(ICON_FONT).into()
 }
 
 async fn pick_file() -> Result<(PathBuf, Arc<String>), Error> {
