@@ -29,6 +29,7 @@ struct Editor {
     content: text_editor::Content,
     theme: highlighter::Theme,
     error: Option<Error>,
+    is_dirty: bool,
 }
 #[derive(Debug, Clone)]
 enum Message {
@@ -59,6 +60,7 @@ impl Application for Editor {
                 error: None,
                 path: None,
                 theme: highlighter::Theme::SolarizedDark,
+                is_dirty: false,
             },
             Command::perform(load_file(default_file), Message::FileOpened),
         )
@@ -70,12 +72,21 @@ impl Application for Editor {
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
+            Message::New => {
+                self.is_dirty = true;
+                self.path = None;
+                self.content = text_editor::Content::new();
+                Command::none()
+            }
             Message::Edit(action) => {
+                self.is_dirty = self.is_dirty || action.is_edit();
                 self.content.edit(action);
                 self.error = None;
                 Command::none()
             }
+            Message::Open => Command::perform(pick_file(), Message::FileOpened),
             Message::FileOpened(Ok((path, content))) => {
+                self.is_dirty = false;
                 self.path = Some(path);
                 self.content = text_editor::Content::with(&content);
                 Command::none()
@@ -84,17 +95,12 @@ impl Application for Editor {
                 self.error = Some(error);
                 Command::none()
             }
-            Message::Open => Command::perform(pick_file(), Message::FileOpened),
-            Message::New => {
-                self.path = None;
-                self.content = text_editor::Content::new();
-                Command::none()
-            }
             Message::Save => {
                 let text = self.content.text();
                 Command::perform(save_file(self.path.clone(), text), Message::FileSaved)
             }
             Message::FileSaved(Ok(path)) => {
+                self.is_dirty = false;
                 self.path = Some(path);
                 Command::none()
             }
@@ -112,9 +118,13 @@ impl Application for Editor {
 
     fn view(&self) -> Element<'_, Message> {
         let controls = row!(
-            action(new_icon(), NEW_TIP, Message::New),
-            action(open_icon(), OPEN_TIP, Message::Open),
-            action(save_icon(), SAVE_TIP, Message::Save),
+            action(new_icon(), NEW_TIP, Some(Message::New)),
+            action(open_icon(), OPEN_TIP, Some(Message::Open)),
+            action(
+                save_icon(),
+                SAVE_TIP,
+                self.is_dirty.then_some(Message::Save)
+            ),
             horizontal_space(Length::Fill),
             pick_list(
                 highlighter::Theme::ALL,
@@ -172,11 +182,17 @@ impl Application for Editor {
 fn action<'a>(
     content: Element<'a, Message>,
     label: &str,
-    on_press: Message,
+    on_press: Option<Message>,
 ) -> Element<'a, Message> {
+    let is_disabled = on_press.is_none();
     let btn = button(container(content).width(30).center_x())
-        .on_press(on_press)
-        .padding([5, 10]);
+        .on_press_maybe(on_press)
+        .padding([5, 10])
+        .style(if is_disabled {
+            theme::Button::Secondary
+        } else {
+            theme::Button::Primary
+        });
     tooltip(btn, label, tooltip::Position::FollowCursor)
         .style(theme::Container::Box)
         .into()
