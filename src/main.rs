@@ -5,8 +5,12 @@ use std::{
 };
 
 use iced::{
-    Application, Command, Element, Font, Length, Settings, Theme, executor, theme,
-    widget::{button, column, container, horizontal_space, row, text, text_editor, tooltip},
+    Application, Command, Element, Font, Length, Settings, Theme, executor,
+    highlighter::{self, Highlighter},
+    theme,
+    widget::{
+        button, column, container, horizontal_space, pick_list, row, text, text_editor, tooltip,
+    },
 };
 
 fn main() -> iced::Result {
@@ -23,6 +27,7 @@ fn main() -> iced::Result {
 struct Editor {
     path: Option<PathBuf>,
     content: text_editor::Content,
+    theme: highlighter::Theme,
     error: Option<Error>,
 }
 #[derive(Debug, Clone)]
@@ -33,6 +38,7 @@ enum Message {
     FileSaved(Result<PathBuf, Error>),
     Edit(text_editor::Action),
     FileOpened(Result<(PathBuf, Arc<String>), Error>),
+    ThemeSelected(highlighter::Theme),
 }
 
 const NEW_TIP: &str = "new file";
@@ -52,6 +58,7 @@ impl Application for Editor {
                 content: text_editor::Content::new(),
                 error: None,
                 path: None,
+                theme: highlighter::Theme::SolarizedDark,
             },
             Command::perform(load_file(default_file), Message::FileOpened),
         )
@@ -95,6 +102,11 @@ impl Application for Editor {
                 self.error = Some(error);
                 Command::none()
             }
+            Message::ThemeSelected(theme) => {
+                self.theme = theme;
+
+                Command::none()
+            }
         }
     }
 
@@ -103,9 +115,30 @@ impl Application for Editor {
             action(new_icon(), NEW_TIP, Message::New),
             action(open_icon(), OPEN_TIP, Message::Open),
             action(save_icon(), SAVE_TIP, Message::Save),
+            horizontal_space(Length::Fill),
+            pick_list(
+                highlighter::Theme::ALL,
+                Some(self.theme),
+                Message::ThemeSelected
+            ),
         )
         .spacing(10);
-        let input = text_editor(&self.content).on_edit(Message::Edit);
+        let file_ext = self
+            .path
+            .as_ref()
+            .and_then(|path| path.extension()?.to_str())
+            .unwrap_or("rs")
+            .to_string();
+        let input = text_editor(&self.content)
+            .on_edit(Message::Edit)
+            .highlight::<Highlighter>(
+                highlighter::Settings {
+                    theme: self.theme,
+                    extension: file_ext,
+                },
+                |highlighter, _theme| highlighter.to_format(),
+            );
+
         let status_bar = {
             let status = if let Some(Error::IOFailed(error)) = self.error.as_ref() {
                 text(error.to_string())
@@ -128,7 +161,11 @@ impl Application for Editor {
     }
 
     fn theme(&self) -> Theme {
-        self::Theme::Dark
+        if self.theme.is_dark() {
+            self::Theme::Dark
+        } else {
+            self::Theme::Light
+        }
     }
 }
 
