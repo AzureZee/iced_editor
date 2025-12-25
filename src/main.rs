@@ -5,9 +5,9 @@ use std::{
 };
 
 use iced::{
-    Application, Command, Element, Font, Length, Settings, Theme, executor,
+    Application, Command, Element, Font, Length, Settings, Subscription, Theme, executor,
     highlighter::{self, Highlighter},
-    theme,
+    keyboard, theme,
     widget::{
         button, column, container, horizontal_space, pick_list, row, text, text_editor, tooltip,
     },
@@ -15,6 +15,7 @@ use iced::{
 
 fn main() -> iced::Result {
     Editor::run(Settings {
+        default_font:Font::with_name("JetBrainsMono Nerd Font Propo"),
         fonts: vec![
             include_bytes!("../fonts/editor_icons.ttf")
                 .as_slice()
@@ -115,7 +116,12 @@ impl Application for Editor {
             }
         }
     }
-
+    fn subscription(&self) -> Subscription<Message> {
+        keyboard::on_key_press(|key_code, modifiers| match key_code {
+            keyboard::KeyCode::S if modifiers.command() => Some(Message::Save),
+            _ => None,
+        })
+    }
     fn view(&self) -> Element<'_, Message> {
         let controls = row!(
             action(new_icon(), NEW_TIP, Some(Message::New)),
