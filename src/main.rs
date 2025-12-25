@@ -5,7 +5,8 @@ use std::{
 };
 
 use iced::{
-    Application, Command, Element, Font, Length, Settings, Theme, executor, theme, widget::{button, column, container, horizontal_space, row, text, text_editor, tooltip}
+    Application, Command, Element, Font, Length, Settings, Theme, executor, theme,
+    widget::{button, column, container, horizontal_space, row, text, text_editor, tooltip},
 };
 
 fn main() -> iced::Result {
@@ -99,9 +100,9 @@ impl Application for Editor {
 
     fn view(&self) -> Element<'_, Message> {
         let controls = row!(
-            action(new_icon(), NEW_TIP,Message::New),
-            action(open_icon(),OPEN_TIP, Message::Open),
-            action(save_icon(),SAVE_TIP, Message::Save),
+            action(new_icon(), NEW_TIP, Message::New),
+            action(open_icon(), OPEN_TIP, Message::Open),
+            action(save_icon(), SAVE_TIP, Message::Save),
         )
         .spacing(10);
         let input = text_editor(&self.content).on_edit(Message::Edit);
@@ -139,7 +140,9 @@ fn action<'a>(
     let btn = button(container(content).width(30).center_x())
         .on_press(on_press)
         .padding([5, 10]);
-    tooltip(btn, label, tooltip::Position::FollowCursor).style(theme::Container::Box).into()
+    tooltip(btn, label, tooltip::Position::FollowCursor)
+        .style(theme::Container::Box)
+        .into()
 }
 
 const SAVE_ICON: char = '\u{E800}';
