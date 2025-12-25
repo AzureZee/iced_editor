@@ -5,8 +5,7 @@ use std::{
 };
 
 use iced::{
-    Application, Command, Element, Font, Length, Settings, Theme, executor,
-    widget::{button, column, container, horizontal_space, row, text, text_editor},
+    Application, Command, Element, Font, Length, Settings, Theme, executor, theme, widget::{button, column, container, horizontal_space, row, text, text_editor, tooltip}
 };
 
 fn main() -> iced::Result {
@@ -34,6 +33,11 @@ enum Message {
     Edit(text_editor::Action),
     FileOpened(Result<(PathBuf, Arc<String>), Error>),
 }
+
+const NEW_TIP: &str = "new file";
+const OPEN_TIP: &str = "open file";
+const SAVE_TIP: &str = "save file";
+
 impl Application for Editor {
     type Message = Message;
     type Executor = executor::Default;
@@ -95,9 +99,9 @@ impl Application for Editor {
 
     fn view(&self) -> Element<'_, Message> {
         let controls = row!(
-            action(new_icon(), Message::New),
-            action(open_icon(), Message::Open),
-            action(save_icon(), Message::Save),
+            action(new_icon(), NEW_TIP,Message::New),
+            action(open_icon(),OPEN_TIP, Message::Open),
+            action(save_icon(),SAVE_TIP, Message::Save),
         )
         .spacing(10);
         let input = text_editor(&self.content).on_edit(Message::Edit);
@@ -127,11 +131,15 @@ impl Application for Editor {
     }
 }
 
-fn action<'a>(content: Element<'a, Message>, on_press: Message) -> Element<'a, Message> {
-    button(container(content).width(30).center_x())
+fn action<'a>(
+    content: Element<'a, Message>,
+    label: &str,
+    on_press: Message,
+) -> Element<'a, Message> {
+    let btn = button(container(content).width(30).center_x())
         .on_press(on_press)
-        .padding([5, 10])
-        .into()
+        .padding([5, 10]);
+    tooltip(btn, label, tooltip::Position::FollowCursor).style(theme::Container::Box).into()
 }
 
 const SAVE_ICON: char = '\u{E800}';
@@ -146,10 +154,10 @@ fn save_icon<'a, Message>() -> Element<'a, Message> {
 fn open_icon<'a, Message>() -> Element<'a, Message> {
     icon(OPEN_ICON)
 }
-fn icon<'a, Message>(codepoint: char) -> Element<'a, Message> {
+fn icon<'a, Message>(code_point: char) -> Element<'a, Message> {
     const ICON_FONT: Font = Font::with_name("editor_icons");
 
-    text(codepoint).font(ICON_FONT).into()
+    text(code_point).font(ICON_FONT).into()
 }
 
 async fn pick_file() -> Result<(PathBuf, Arc<String>), Error> {
